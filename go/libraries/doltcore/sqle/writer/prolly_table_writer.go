@@ -132,7 +132,7 @@ func getSecondaryKeylessProllyWriters(ctx context.Context, t *doltdb.Table, schS
 			prefixLengths: def.PrefixLengths,
 			keyBld:        val.NewTupleBuilder(keyDesc, m.NodeStore()),
 			prefixBld:     val.NewTupleBuilder(keyDesc.PrefixDesc(def.Count), m.NodeStore()),
-			hashBld:       val.NewTupleBuilder(val.NewTupleDescriptor(val.Type{Enc: val.Hash128Enc}), ns),
+			hashBld:       val.NewTupleBuilder(val.NewTupleDescriptor(val.Type{Enc: val.Hash128Enc}), m.NodeStore()),
 			keyMap:        def.KeyMapping,
 		}
 	}
@@ -284,7 +284,7 @@ func (w *prollyTableWriter) PreciseMatch() bool {
 }
 
 // IndexedAccess implements sql.IndexAddressableTable.
-func (w *prollyTableWriter) IndexedAccess(i sql.IndexLookup) sql.IndexedTable {
+func (w *prollyTableWriter) IndexedAccess(_ *sql.Context, i sql.IndexLookup) sql.IndexedTable {
 	idx := index.DoltIndexFromSqlIndex(i.Index)
 	return &prollyFkIndexer{
 		writer: w,
