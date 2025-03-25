@@ -147,7 +147,8 @@ func testRoundTripInts(t *testing.T) {
 		for idx, value := range test.data {
 			bld.PutInt64(idx, value)
 		}
-		tup := bld.Build(testPool)
+		tup, err := bld.Build(testPool)
+		assert.NoError(t, err)
 
 		// verify
 		n := test.desc.Count()

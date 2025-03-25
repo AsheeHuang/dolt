@@ -286,10 +286,10 @@ func TestGeometryEncoding(t *testing.T) {
 			builder := val.NewTupleBuilder(oldDesc, ns)
 			b := serializeGeometry(test.value)
 			builder.PutGeometry(0, b)
-			tup := builder.Build(testPool)
+			tup, err := builder.Build(testPool)
+			require.NoError(t, err)
 
 			var v interface{}
-			var err error
 
 			v, err = GetField(context.Background(), oldDesc, 0, tup, ns)
 			assert.NoError(t, err)
