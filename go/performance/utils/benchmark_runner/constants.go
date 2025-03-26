@@ -48,6 +48,7 @@ const (
 	sysbenchDbPsModeDisable      = "disable"
 	sysbenchRandTypeFlag         = "--rand-type"
 	sysbenchRandTypeUniform      = "uniform"
+	sysbenchMysqlSslFlag         = "--mysql-ssl"
 	sysbenchMysqlDbFlag          = "--mysql-db"
 	sysbenchDbDriverFlag         = "--db-driver"
 	sysbenchMysqlHostFlag        = "--mysql-host"

@@ -125,6 +125,7 @@ func (sc *doltServerConfigImpl) GetServerArgs() ([]string, error) {
 func (sc *doltServerConfigImpl) GetTestingParams(testConfig TestConfig) TestParams {
 	params := NewSysbenchTestParams()
 	params.Append(defaultSysbenchParams...)
+	params.Append(fmt.Sprintf("%s=%s", sysbenchMysqlSslFlag, "off"))
 	params.Append(fmt.Sprintf("%s=%s", sysbenchMysqlDbFlag, dbName))
 	params.Append(fmt.Sprintf("%s=%s", sysbenchDbDriverFlag, mysqlDriverName))
 	params.Append(fmt.Sprintf("%s=%s", sysbenchMysqlHostFlag, sc.Host))
