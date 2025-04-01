@@ -300,7 +300,7 @@ func PutField(ctx context.Context, ns NodeStore, tb *val.TupleBuilder, i int, v 
 }
 
 func getJSONAddrHash(ctx context.Context, ns NodeStore, v interface{}) (hash.Hash, error) {
-	j, err := convJson(v)
+	j, err := convJson(ctx, v)
 	if err != nil {
 		return hash.Hash{}, err
 	}
@@ -429,8 +429,8 @@ func SerializeBytesToAddr(ctx context.Context, ns NodeStore, r io.Reader, dataSi
 	return node, addr, nil
 }
 
-func convJson(v interface{}) (res sql.JSONWrapper, err error) {
-	v, _, err = types.JSON.Convert(v)
+func convJson(ctx context.Context, v interface{}) (res sql.JSONWrapper, err error) {
+	v, _, err = types.JSON.Convert(ctx, v)
 	if err != nil {
 		return nil, err
 	}
