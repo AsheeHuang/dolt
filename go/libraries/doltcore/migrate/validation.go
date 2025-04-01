@@ -191,11 +191,11 @@ func equalRows(old, new sql.Row, sch sql.Schema) (bool, error) {
 			if n, _, err = gmstypes.Int64.Convert(new[i]); err != nil {
 				return false, err
 			}
-			if cmp, err = gmstypes.Int64.Compare(o, n); err != nil {
+			if cmp, err = gmstypes.Int64.Compare(ctx, o, n); err != nil {
 				return false, err
 			}
 		} else {
-			if cmp, err = sch[i].Type.Compare(old[i], new[i]); err != nil {
+			if cmp, err = sch[i].Type.Compare(ctx, old[i], new[i]); err != nil {
 				return false, err
 			}
 		}
