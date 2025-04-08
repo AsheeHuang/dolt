@@ -66,6 +66,7 @@ func (sc *StatsController) runWorker(ctx context.Context) (err error) {
 
 		gcKv = nil
 		genStart := sc.genCnt.Load()
+		startTime := time.Now()
 
 		select {
 		case <-gcTicker.C:
@@ -91,9 +92,9 @@ func (sc *StatsController) runWorker(ctx context.Context) (err error) {
 			} else {
 				sc.descError("swapped stats with flush failure", err)
 			}
-		} else if ok && lastSuccessfulStats != nil && lastSuccessfulStats.hash != newStats.hash {
+		} else if ok && lastSuccessfulStats != nil || lastSuccessfulStats.hash != newStats.hash {
 			lastSuccessfulStats = newStats
-			sc.logger.Tracef("stats successful swap: %s\n", newStats.String())
+			sc.logger.Debug("stats successful swap: %s took %s\n", newStats.String(), time.Since(startTime))
 		}
 
 		select {
@@ -160,10 +161,14 @@ func (sc *StatsController) trySwapStats(ctx context.Context, prevGen uint64, new
 			func() {
 				sc.mu.Unlock()
 				defer sc.mu.Lock()
-				if err := sc.sq.DoSync(ctx, func() error {
-					_, err := sc.Flush(ctx)
-					return err
-				}); err != nil {
+
+				sqlCtx, err := sc.ctxGen(ctx)
+				if err != nil {
+					sc.descError("", err)
+				}
+
+				defer sql.SessionEnd(sqlCtx.Session)
+				if _, err := sc.Flush(sqlCtx, sc.sq); err != nil {
 					sc.descError("", err)
 				}
 			}()

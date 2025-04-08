@@ -17,6 +17,7 @@ package prolly
 import (
 	"context"
 	"io"
+	"runtime/trace"
 	"strconv"
 	"strings"
 
@@ -161,6 +162,8 @@ func (mut *GenericMutableMap[M, T]) Revert(ctx context.Context) {
 }
 
 func (mut *GenericMutableMap[M, T]) flushPending(ctx context.Context) error {
+	defer trace.StartRegion(ctx, "MutableMap.flushPending").End()
+
 	stash := mut.stash
 	// if our in-memory edit set contains a checkpoint, we
 	// must stash a copy of |mut.tuples| we can revert to.

@@ -156,7 +156,7 @@ func TestProllyKv(t *testing.T) {
 
 		kv := newTestProllyKv(t, bthreads)
 		kv.mem = to
-		cnt, err := kv.Flush(ctx)
+		cnt, err := kv.Flush(ctx, nil)
 		require.NoError(t, err)
 		require.Equal(t, 20, cnt)
 	})
