@@ -329,13 +329,15 @@ func (sc *StatsController) collectIndexNodes(ctx *sql.Context, prollyMap prolly.
 			var n tree.Node
 			var start, stop uint64
 			var treeCnt int
-			if r := recover(); r != nil {
-				log.Printf("treeCnt: %d, start: %d, stop: %d\n, node: %s", treeCnt, start, stop, n.HashOf())
-				err = fmt.Errorf("serialQueue panicked running work: %s\n%s", r, string(debug.Stack()))
-				log.Println(err)
-				panic("")
-				return
-			}
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("treeCnt: %d, start: %d, stop: %d\n, node: %s", treeCnt, start, stop, n.HashOf())
+					err = fmt.Errorf("serialQueue panicked running work: %s\n%s", r, string(debug.Stack()))
+					log.Println(err)
+					panic("")
+					return
+				}
+			}()
 
 			newWrites := 0
 			for i < len(nodes) && newWrites < collectBatchSize {
