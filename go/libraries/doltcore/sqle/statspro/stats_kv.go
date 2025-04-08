@@ -314,9 +314,7 @@ func (p *prollyStats) LoadFromMem(ctx *sql.Context, sq *jobqueue.SerialQueue) er
 		var i int
 		for i < len(keys) {
 			batchEnd := min(len(keys), i+statsMaxPending)
-			err := sq.DoSync(ctx, func() error {
-				sql.SessionCommandBegin(ctx.Session)
-				defer sql.SessionCommandEnd(ctx.Session)
+			err := sq.DoSyncSessionAware(ctx, func() error {
 				for ; i < batchEnd; i++ {
 					key := keys[i]
 					b, ok := p.mem.buckets[key]

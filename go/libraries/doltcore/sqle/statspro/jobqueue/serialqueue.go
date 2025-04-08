@@ -17,7 +17,6 @@ package jobqueue
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -428,9 +427,9 @@ func (s *SerialQueue) runRunner(ctx context.Context) {
 			func() {
 				var err error
 				defer func() {
-					if r := recover(); r != nil {
-						err = fmt.Errorf("serialQueue panicked running work: %s", r)
-					}
+					//if r := recover(); r != nil {
+					//	err = fmt.Errorf("serialQueue panicked running work: %s", r)
+					//}
 					if err != nil {
 						s.errCb(err)
 					}

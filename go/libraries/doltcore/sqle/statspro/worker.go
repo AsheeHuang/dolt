@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -181,9 +182,9 @@ func (sc *StatsController) trySwapStats(ctx context.Context, prevGen uint64, new
 
 func (sc *StatsController) newStatsForRoot(baseCtx context.Context, gcKv *memStats) (newStats *rootStats, err error) {
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("worker panicked running work: %s", r)
-		}
+		//if r := recover(); r != nil {
+		//	err = fmt.Errorf("worker panicked running work: %s", r)
+		//}
 		if err != nil {
 			sc.descError("stats update interrupted", err)
 		}
@@ -325,16 +326,27 @@ func (sc *StatsController) collectIndexNodes(ctx *sql.Context, prollyMap prolly.
 	var offset uint64
 	for i := 0; i < len(nodes); {
 		err := sc.sq.DoSyncSessionAware(ctx, func() (err error) {
+			var n tree.Node
+			var start, stop uint64
+			var treeCnt int
+			if r := recover(); r != nil {
+				log.Printf("treeCnt: %d, start: %d, stop: %d\n, node: %s", treeCnt, start, stop, n.HashOf())
+				err = fmt.Errorf("serialQueue panicked running work: %s\n%s", r, string(debug.Stack()))
+				log.Println(err)
+				panic("")
+				return
+			}
+
 			newWrites := 0
 			for i < len(nodes) && newWrites < collectBatchSize {
-				n := nodes[i]
+				n = nodes[i]
 				i++
 
-				treeCnt, err := n.TreeCount()
+				treeCnt, err = n.TreeCount()
 				if err != nil {
 					return err
 				}
-				start, stop := offset, offset+uint64(treeCnt)
+				start, stop = offset, offset+uint64(treeCnt)
 				offset = stop
 
 				if _, ok, err := sc.GetBucket(ctx, n.HashOf(), keyBuilder); err != nil {
