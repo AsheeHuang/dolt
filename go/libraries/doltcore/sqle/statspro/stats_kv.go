@@ -20,15 +20,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/statspro/jobqueue"
+	"github.com/dolthub/go-mysql-server/sql"
+	"github.com/dolthub/go-mysql-server/sql/stats"
+	"github.com/dolthub/go-mysql-server/sql/types"
 	"runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dolthub/go-mysql-server/sql"
-	"github.com/dolthub/go-mysql-server/sql/stats"
-	"github.com/dolthub/go-mysql-server/sql/types"
 
 	"github.com/dolthub/dolt/go/libraries/doltcore/schema"
 	"github.com/dolthub/dolt/go/libraries/doltcore/sqle/dsess"
@@ -342,6 +341,15 @@ func (p *prollyStats) LoadFromMem(ctx *sql.Context, sq *jobqueue.SerialQueue) er
 }
 
 func (p *prollyStats) Flush(ctx *sql.Context, sq *jobqueue.SerialQueue) (int, error) {
+	if !p.m.HasEdits() {
+		return 0, nil
+	}
+	defer trace.StartRegion(ctx, "StatsController.Flush").End()
+	start := time.Now()
+	defer func() {
+		ctx.GetLogger().Debugf("StatsController.Flush took %.2f seconds\n", time.Since(start).Seconds())
+	}()
+
 	if err := p.LoadFromMem(ctx, sq); err != nil {
 		return 0, err
 	}
@@ -546,11 +554,6 @@ func (sc *StatsController) PutBound(h hash.Hash, r sql.Row, l int) {
 }
 
 func (sc *StatsController) Flush(ctx *sql.Context, sq *jobqueue.SerialQueue) (int, error) {
-	defer trace.StartRegion(ctx, "StatsController.Flush").End()
-	start := time.Now()
-	defer func() {
-		ctx.GetLogger().Debugf("StatsController.Flush took %.2f seconds\n", time.Since(start).Seconds())
-	}()
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	defer sc.signalListener(leFlush)
