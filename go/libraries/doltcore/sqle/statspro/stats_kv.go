@@ -551,7 +551,7 @@ func (sc *StatsController) Flush(ctx *sql.Context, sq *jobqueue.SerialQueue) (in
 	defer trace.StartRegion(ctx, "StatsController.Flush").End()
 	start := time.Now()
 	defer func() {
-		ctx.GetLogger().Debug("StatsController.Flush took %s", time.Since(start))
+		ctx.GetLogger().Debugf("StatsController.Flush took %.2f seconds\n", time.Since(start).Seconds())
 	}()
 	sc.mu.Lock()
 	defer sc.mu.Unlock()

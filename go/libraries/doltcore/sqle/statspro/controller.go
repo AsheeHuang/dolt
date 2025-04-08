@@ -201,9 +201,14 @@ func (sc *StatsController) Info(ctx context.Context) (dprocedures.StatsInfo, err
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
+	sqlCtx, err := sc.ctxGen(ctx)
+	if err != nil {
+		return dprocedures.StatsInfo{}, err
+	}
+	
 	// don't use protected access / deadlock
 	cachedBucketCnt := sc.kv.Len()
-	storageCnt, err := sc.kv.Flush(ctx, sc.sq)
+	storageCnt, err := sc.kv.Flush(sqlCtx, sc.sq)
 	if err != nil {
 		return dprocedures.StatsInfo{}, err
 	}

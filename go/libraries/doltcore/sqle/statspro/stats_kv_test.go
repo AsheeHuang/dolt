@@ -154,9 +154,11 @@ func TestProllyKv(t *testing.T) {
 		require.Equal(t, 20, len(to.gcFlusher[tupB]))
 		require.Equal(t, 20, to.Len())
 
+		sqlCtx := sql.NewContext(ctx)
+
 		kv := newTestProllyKv(t, bthreads)
 		kv.mem = to
-		cnt, err := kv.Flush(ctx, nil)
+		cnt, err := kv.Flush(sqlCtx, nil)
 		require.NoError(t, err)
 		require.Equal(t, 20, cnt)
 	})
