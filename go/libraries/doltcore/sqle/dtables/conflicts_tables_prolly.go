@@ -16,7 +16,6 @@ package dtables
 
 import (
 	"encoding/base64"
-	"fmt"
 
 	"github.com/dolthub/go-mysql-server/sql"
 	"github.com/zeebo/xxh3"
@@ -146,6 +145,22 @@ type prollyConflictRowIter struct {
 	theirRows           prolly.Map
 }
 
+// ConflictRowIterator interface implementation
+func (itr *prollyConflictRowIter) GetTableName() doltdb.TableName           { return itr.tblName }
+func (itr *prollyConflictRowIter) GetValueReadWriter() types.ValueReadWriter { return itr.vrw }
+func (itr *prollyConflictRowIter) GetNodeStore() tree.NodeStore              { return itr.ns }
+func (itr *prollyConflictRowIter) GetOurRows() prolly.Map                    { return itr.ourRows }
+func (itr *prollyConflictRowIter) GetOurSchema() schema.Schema               { return itr.ourSch }
+func (itr *prollyConflictRowIter) GetKeyDescriptor() val.TupleDesc           { return itr.kd }
+func (itr *prollyConflictRowIter) GetBaseValueDescriptor() val.TupleDesc     { return itr.baseVD }
+func (itr *prollyConflictRowIter) GetOursValueDescriptor() val.TupleDesc     { return itr.oursVD }
+func (itr *prollyConflictRowIter) GetTheirsValueDescriptor() val.TupleDesc   { return itr.theirsVD }
+func (itr *prollyConflictRowIter) GetOffsets() (int, int, int, int)          { return itr.b, itr.o, itr.t, itr.n }
+func (itr *prollyConflictRowIter) IsKeyless() bool                           { return itr.keyless }
+func (itr *prollyConflictRowIter) LoadTableMaps(ctx *sql.Context, baseHash, theirHash hash.Hash, baseRows, theirRows *prolly.Map, baseHashRef, theirHashRef *hash.Hash) error {
+	return LoadTableMapsFromHashes(ctx, itr.tblName, itr.vrw, itr.ns, itr.ourSch, baseHash, theirHash, baseRows, theirRows, baseHashRef, theirHashRef)
+}
+
 var _ sql.RowIter = (*prollyConflictRowIter)(nil)
 
 // base_cols, our_cols, our_diff_type, their_cols, their_diff_type
@@ -243,115 +258,28 @@ func (itr *prollyConflictRowIter) Next(ctx *sql.Context) (sql.Row, error) {
 }
 
 func (itr *prollyConflictRowIter) putConflictRowVals(ctx *sql.Context, c conf, r sql.Row) error {
-	if c.bV != nil {
-		for i := 0; i < itr.baseVD.Count(); i++ {
-			f, err := tree.GetField(ctx, itr.baseVD, i, c.bV, itr.baseRows.NodeStore())
-			if err != nil {
-				return err
-			}
-			r[itr.b+itr.kd.Count()+i] = f
-		}
+	c_data := ConflictRowData{
+		K:  c.k,
+		BV: c.bV,
+		OV: c.oV,
+		TV: c.tV,
+		H:  c.h,
+		ID: c.id,
 	}
-
-	if c.oV != nil {
-		for i := 0; i < itr.oursVD.Count(); i++ {
-			f, err := tree.GetField(ctx, itr.oursVD, i, c.oV, itr.baseRows.NodeStore())
-			if err != nil {
-				return err
-			}
-			r[itr.o+itr.kd.Count()+i] = f
-		}
-	}
-	r[itr.o+itr.kd.Count()+itr.oursVD.Count()] = GetConflictDiffType(c.bV, c.oV)
-
-	if c.tV != nil {
-		for i := 0; i < itr.theirsVD.Count(); i++ {
-			f, err := tree.GetField(ctx, itr.theirsVD, i, c.tV, itr.baseRows.NodeStore())
-			if err != nil {
-				return err
-			}
-			r[itr.t+itr.kd.Count()+i] = f
-		}
-	}
-	r[itr.t+itr.kd.Count()+itr.theirsVD.Count()] = GetConflictDiffType(c.bV, c.tV)
-	r[itr.t+itr.kd.Count()+itr.theirsVD.Count()+1] = c.id
-
-	return nil
+	return PutConflictRowVals(ctx, itr, c_data, r, itr.baseRows)
 }
 
-func GetConflictDiffType(base val.Tuple, other val.Tuple) string {
-	if base == nil {
-		return merge.ConflictDiffTypeAdded
-	} else if other == nil {
-		return merge.ConflictDiffTypeRemoved
+
+func (itr *prollyConflictRowIter) putKeylessConflictRowVals(ctx *sql.Context, c conf, r sql.Row) error {
+	c_data := ConflictRowData{
+		K:  c.k,
+		BV: c.bV,
+		OV: c.oV,
+		TV: c.tV,
+		H:  c.h,
+		ID: c.id,
 	}
-
-	// There has to be some edit, otherwise it wouldn't be a conflict...
-	return merge.ConflictDiffTypeModified
-}
-
-func (itr *prollyConflictRowIter) putKeylessConflictRowVals(ctx *sql.Context, c conf, r sql.Row) (err error) {
-	ns := itr.baseRows.NodeStore()
-
-	if c.bV != nil {
-		// Cardinality
-		r[itr.n-3], err = tree.GetField(ctx, itr.baseVD, 0, c.bV, ns)
-		if err != nil {
-			return err
-		}
-
-		for i := 0; i < itr.baseVD.Count()-1; i++ {
-			f, err := tree.GetField(ctx, itr.baseVD, i+1, c.bV, ns)
-			if err != nil {
-				return err
-			}
-			r[itr.b+i] = f
-		}
-	} else {
-		r[itr.n-3] = uint64(0)
-	}
-
-	if c.oV != nil {
-		r[itr.n-2], err = tree.GetField(ctx, itr.oursVD, 0, c.oV, ns)
-		if err != nil {
-			return err
-		}
-
-		for i := 0; i < itr.oursVD.Count()-1; i++ {
-			f, err := tree.GetField(ctx, itr.oursVD, i+1, c.oV, ns)
-			if err != nil {
-				return err
-			}
-			r[itr.o+i] = f
-		}
-	} else {
-		r[itr.n-2] = uint64(0)
-	}
-
-	r[itr.o+itr.oursVD.Count()-1] = GetConflictDiffType(c.bV, c.oV)
-
-	if c.tV != nil {
-		r[itr.n-1], err = tree.GetField(ctx, itr.theirsVD, 0, c.tV, ns)
-		if err != nil {
-			return err
-		}
-
-		for i := 0; i < itr.theirsVD.Count()-1; i++ {
-			f, err := tree.GetField(ctx, itr.theirsVD, i+1, c.tV, ns)
-			if err != nil {
-				return err
-			}
-			r[itr.t+i] = f
-		}
-	} else {
-		r[itr.n-1] = uint64(0)
-	}
-
-	o := itr.t + itr.theirsVD.Count() - 1
-	r[o] = GetConflictDiffType(c.bV, c.tV)
-	r[itr.n-4] = c.id
-
-	return nil
+	return PutKeylessConflictRowVals(ctx, itr, c_data, r, itr.baseRows)
 }
 
 type conf struct {
@@ -405,61 +333,7 @@ func (itr *prollyConflictRowIter) nextConflictVals(ctx *sql.Context) (c conf, er
 // loadTableMaps loads the maps specified in the metadata if they are different from
 // the currently loaded maps. |baseHash| and |theirHash| are table hashes.
 func (itr *prollyConflictRowIter) loadTableMaps(ctx *sql.Context, baseHash, theirHash hash.Hash) error {
-	if itr.baseHash.Compare(baseHash) != 0 {
-		rv, err := doltdb.LoadRootValueFromRootIshAddr(ctx, itr.vrw, itr.ns, baseHash)
-		if err != nil {
-			return err
-		}
-		baseTbl, ok, err := rv.GetTable(ctx, itr.tblName)
-		if err != nil {
-			return err
-		}
-
-		var idx durable.Index
-		if !ok {
-			idx, err = durable.NewEmptyPrimaryIndex(ctx, itr.vrw, itr.ns, itr.ourSch)
-		} else {
-			idx, err = baseTbl.GetRowData(ctx)
-		}
-
-		if err != nil {
-			return err
-		}
-
-		itr.baseRows, err = durable.ProllyMapFromIndex(idx)
-		if err != nil {
-			return err
-		}
-
-		itr.baseHash = baseHash
-	}
-
-	if itr.theirHash.Compare(theirHash) != 0 {
-		rv, err := doltdb.LoadRootValueFromRootIshAddr(ctx, itr.vrw, itr.ns, theirHash)
-		if err != nil {
-			return err
-		}
-
-		theirTbl, ok, err := rv.GetTable(ctx, itr.tblName)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("failed to find table %s in right root value", itr.tblName)
-		}
-
-		idx, err := theirTbl.GetRowData(ctx)
-		if err != nil {
-			return err
-		}
-		itr.theirRows, err = durable.ProllyMapFromIndex(idx)
-		if err != nil {
-			return err
-		}
-		itr.theirHash = theirHash
-	}
-
-	return nil
+	return LoadTableMapsFromHashes(ctx, itr.tblName, itr.vrw, itr.ns, itr.ourSch, baseHash, theirHash, &itr.baseRows, &itr.theirRows, &itr.baseHash, &itr.theirHash)
 }
 
 func (itr *prollyConflictRowIter) Close(ctx *sql.Context) error {
