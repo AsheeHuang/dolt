@@ -51,7 +51,7 @@ func newRangeDiff(previousKey, key Item, from, to Item, subtreeCount uint64, lev
 	}
 }
 
-func newRangeRemovedDiff(previousKey, key Item, from Item) Diff {
+func newRangeRemovedDiff(previousKey, key Item, from Item, level int) Diff {
 	return Diff{
 		Type: RangeRemovedDiff,
 		From: from,
@@ -60,7 +60,7 @@ func newRangeRemovedDiff(previousKey, key Item, from Item) Diff {
 			Key:          key,
 			To:           nil,
 			SubtreeCount: 0,
-			Level:        0,
+			Level:        level,
 		},
 	}
 }
@@ -492,7 +492,7 @@ func (td *Differ[K, O]) sendRange() (diff Diff, err error) {
 }
 
 func (td *Differ[K, O]) sendRangeRemoved() (diff Diff, err error) {
-	diff = newRangeRemovedDiff(td.previousKey, td.from.CurrentKey(), td.from.currentValue())
+	diff = newRangeRemovedDiff(td.previousKey, td.from.CurrentKey(), td.from.currentValue(), td.from.nd.Level())
 	td.previousDiffType = RangeRemovedDiff
 	return diff, nil
 }
