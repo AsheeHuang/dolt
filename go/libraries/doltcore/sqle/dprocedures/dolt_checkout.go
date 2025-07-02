@@ -698,7 +698,13 @@ func checkoutTablesFromHead(ctx *sql.Context, roots doltdb.Roots, name string, t
 	}
 
 	dSess := dsess.DSessFromSess(ctx.Session)
-	return dSess.SetRoots(ctx, name, roots)
+	if err = dSess.SetRoots(ctx, name, roots); err != nil {
+		return err
+	}
+	if err = commitTransaction(ctx, dSess, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
 // validateNoDetachedHead checks if the given branchName refers to a tag or commit hash
